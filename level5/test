@@ -1,0 +1,14 @@
+0x08048510 <- main return addr
+
+080484a4 <- o addr == 134513828
+
+80483d0 <- exit call addr
+
+//
+
+0x80484a4 <- o addr == 134513828
+
+0x8049838 <= exit jump \x38\x98\x04\x08
+
+0x08049839 <- offs table addr
+
