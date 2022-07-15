@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdio.h>
 
-char buffer[76];
 
 void
 run (void) {
@@ -14,6 +13,8 @@ run (void) {
 
 int
 main (int ac, char **av) {
+	char buffer[76];
+	
 	gets(buffer);
 	return (0);
 }

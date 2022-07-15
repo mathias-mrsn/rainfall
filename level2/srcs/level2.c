@@ -3,11 +3,10 @@
 #include <string.h>
 #include <stdio.h>
 
-char	buffer[76];
-
 void
 p (void) {
 	void	*ret_addr;
+	char	buffer[76];
 
 	fflush(stdout);
 	gets(buffer);

