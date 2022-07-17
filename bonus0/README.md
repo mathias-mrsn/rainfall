@@ -1,6 +1,6 @@
 ## BONUS 0
 
-Resources:
+Ressources:
 - [Disassembled code](disassembled_code.md)
 - [Source code](srcs/bonus0.c)
 
