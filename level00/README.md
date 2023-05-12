@@ -16,7 +16,7 @@ Dump of assembler code for function main:
    [...]
   ```
 
-We can see above that the program call ```atoi()``` then compare the result with ```0x1a7``` this value is 423 in decimal.
+We can see above that the program call `atoi()` then compare the result with `0x1a7` this value is 423 in decimal.
 
 Let's try to use this value as parameter and see what happens !
 
@@ -26,7 +26,7 @@ $ whoami
 level1
 ```
 
-Perfect, we can now use this shell with level1 owner to open the ```.pass``` file.
+Perfect, we can now use this shell with level1 owner to open the `.pass` file.
 
 ```shell
 $ cat /home/user/level1/.pass
