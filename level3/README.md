@@ -1,7 +1,7 @@
 ## LEVEL 3
 ---
 
-As usual, I disasemble the binary, you can find the asm file [here](./asm/level3.asm).
+As usual, I disassemble the binary. You can find the ASM file. [here](./asm/level3.asm).
 
 Here is the most important parts.
 
