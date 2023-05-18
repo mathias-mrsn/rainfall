@@ -4,7 +4,7 @@ n:
     0x08048457 <+3>:	sub    $0x18,%esp ; Allocate 24 bytes.
     0x0804845a <+6>:	movl   $0x80485b0,(%esp) ; Put the string "/bin/cat /home/user/level7/.pass" inside $esp
     0x08048461 <+13>:	call   0x8048370 <system@plt> ; Call system with "/bin/cat /home/user/level7/.pass" as argument
-    0x08048466 <+18>:	leave  ; Free the 24 bytes, $esp to $ebp, set $ebp to (old ebp) and pop (old ebp)
+    0x08048466 <+18>:	leave  ; Set $esp to $ebp, set $ebp to (old ebp) and pop (old ebp)
     0x08048467 <+19>:	ret ; Go to return address
 
 m:
