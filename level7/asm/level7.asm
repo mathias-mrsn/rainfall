@@ -34,7 +34,7 @@ main:
     0x08048552 <+49>:	mov    0x1c(%esp),%eax ; Move address at 28th byte of the stack into $eax
     0x08048556 <+53>:	mov    %edx,0x4(%eax) ; Move the return value of malloc() into the 32nd byte of the stack
     {
-        *(ptr1 + 4) = malloc(8);
+        *(ptr1 + 1) = malloc(8);
     }
     0x08048559 <+56>:	movl   $0x8,(%esp) ; Move 8 into the first 4 bytes of the stack
     0x08048560 <+63>:	call   0x80483f0 <malloc@plt> ; Call malloc() with 8 as the argument
@@ -53,7 +53,7 @@ main:
     0x08048581 <+96>:	mov    0x18(%esp),%eax ; Move the address at the 24th byte of the stack into $eax
     0x08048585 <+100>:	mov    %edx,0x4(%eax) ; Move the return value of malloc() into the 28th byte of the stack
     {
-        *(ptr2 + 4) = malloc(8);
+        *(ptr2 + 1) = malloc(8);
     }
     0x08048588 <+103>:	mov    0xc(%ebp),%eax ; Move the arguments of main() into $eax
     {
@@ -68,13 +68,13 @@ main:
     0x08048592 <+113>:	mov    0x1c(%esp),%eax ; Move the address at the 28th byte of the stack into $eax
     0x08048596 <+117>:	mov    0x4(%eax),%eax ; Move the value at the 32nd byte of the stack into $eax
     {
-        $eax = (ptr1 + 4);
+        $eax = (ptr1 + 1);
     }
     0x08048599 <+120>:	mov    %edx,0x4(%esp) ; Move the second argument into the 4th byte of the stack
     0x0804859d <+124>:	mov    %eax,(%esp) ; Move the value at the 32nd byte of the stack into the first byte of the stack
     0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt> ; Call strcpy() with argv[1] and the pointer allocated to 1
     {
-        strcpy((ptr1 + 4), argv[1]);
+        strcpy(*(ptr1 + 1), argv[1]);
     }
     0x080485a5 <+132>:	mov    0xc(%ebp),%eax ; Move the arguments of main() into $eax
     0x080485a8 <+135>:	add    $0x8,%eax ; Add 8 to $eax to reach the third argument
@@ -86,13 +86,13 @@ main:
     0x080485af <+142>:	mov    0x18(%esp),%eax ; Move the address at the 24th byte of the stack into $eax
     0x080485b3 <+146>:	mov    0x4(%eax),%eax ; Move the value at the 28th byte of the stack into $eax
     {
-        $eax = (ptr2 + 4);
+        $eax = (ptr2 + 1);
     }
     0x080485b6 <+149>:	mov    %edx,0x4(%esp) ; Load the third argument into the 4th byte of the stack
     0x080485ba <+153>:	mov    %eax,(%esp) ; Load the value at the 28th byte of the stack into the first byte of the stack
     0x080485bd <+156>:	call   0x80483e0 <strcpy@plt> ; Call strcpy() with argv[2] and the pointer allocated to 2
     {
-        strcpy((ptr2 + 4), argv[2]);
+        strcpy(*(ptr2 + 1), argv[2]);
     }
     0x080485c2 <+161>:	mov    $0x80486e9,%edx ; Load the address of "r" into $edx
     0x080485c7 <+166>:	mov    $0x80486eb,%eax ; Load the address of "/home/user/level8/.pass" into $eax

