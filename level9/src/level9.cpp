@@ -31,5 +31,5 @@ int main(int argc, char **argv) {
 	N *n1_ptr = n1;
 	N *n2_ptr = n2;
 	n1_ptr->setAnnotation(argv[1]);
-	return (*n2_ptr + *n1_ptr);
+	return ((n2_ptr)->operator+(*n1_ptr));
 }

