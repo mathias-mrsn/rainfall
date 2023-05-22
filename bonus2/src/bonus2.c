@@ -38,6 +38,7 @@ main (int argc, char **argv) {
 			language = 2;
 		}
 	}
+    // memcpy(buffer-72, buffer, 72);
 	greetuser(buffer);
 	return (0);
 }
