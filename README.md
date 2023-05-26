@@ -23,3 +23,6 @@ The sharing of this project on my GitHub aims to help peoples to open their mind
 - [Bonus 2](/bonus2)
 - [Bonus 3](/bonus3)
 
+---
+Thanks to @besellem with who I worked on this project and solved the mandatory levels with him !
+
