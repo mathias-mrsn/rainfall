@@ -22,7 +22,3 @@ The sharing of this project on my GitHub aims to help peoples to open their mind
 - [Bonus 1](/bonus1)
 - [Bonus 2](/bonus2)
 - [Bonus 3](/bonus3)
-
----
-Thanks to @besellem, with whom I worked on this project and successfully solved the mandatory levels together!
-
